@@ -1,84 +1,52 @@
-import express from "express";
+const express = require("express");
+const Task = require("../models/Task");
 
-// This will help us connect to the database
-import db from "../db/connection.js";
-
-// This help convert the id from string to ObjectId for the _id.
-import { ObjectId } from "mongodb";
-
-// router is an instance of the express router.
-// We use it to define our routes.
-// The router will be added as a middleware and will take control of requests starting with path /record.
 const router = express.Router();
 
-// This section will help you get a list of all the records.
-router.get("/", async (req, res) => {
-  let collection = await db.collection("records");
-  let results = await collection.find({}).toArray();
-  res.send(results).status(200);
+// Get all tasks for a specific user
+router.get("/:userId", async (req, res) => {
+  try {
+    const tasks = await Task.find({ userId: req.params.userId });
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching tasks" });
+  }
 });
 
-// This section will help you get a single record by id
-router.get("/:id", async (req, res) => {
-  let collection = await db.collection("records");
-  let query = { _id: new ObjectId(req.params.id) };
-  let result = await collection.findOne(query);
-
-  if (!result) res.send("Not found").status(404);
-  else res.send(result).status(200);
-});
-
-// This section will help you create a new record.
+// Add new task
 router.post("/", async (req, res) => {
+  const { text, userId } = req.body;
   try {
-    let newDocument = {
-      name: req.body.name,
-      position: req.body.position,
-      level: req.body.level,
-    };
-    let collection = await db.collection("records");
-    let result = await collection.insertOne(newDocument);
-    res.send(result).status(204);
+    const task = new Task({ text, userId });
+    await task.save();
+    res.json(task);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error adding record");
+    res.status(500).json({ message: "Error adding task" });
   }
 });
 
-// This section will help you update a record by id.
-router.patch("/:id", async (req, res) => {
+// Mark task as completed
+router.put("/:id", async (req, res) => {
   try {
-    const query = { _id: new ObjectId(req.params.id) };
-    const updates = {
-      $set: {
-        name: req.body.name,
-        position: req.body.position,
-        level: req.body.level,
-      },
-    };
-
-    let collection = await db.collection("records");
-    let result = await collection.updateOne(query, updates);
-    res.send(result).status(200);
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { completed: true },
+      { new: true }
+    );
+    res.json(task);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error updating record");
+    res.status(500).json({ message: "Error updating task" });
   }
 });
 
-// This section will help you delete a record
-router.delete("/:id", async (req, res) => {
+// Delete task
+router.delete("/:id/:userId", async (req, res) => {
   try {
-    const query = { _id: new ObjectId(req.params.id) };
-
-    const collection = db.collection("records");
-    let result = await collection.deleteOne(query);
-
-    res.send(result).status(200);
+    await Task.findOneAndDelete({ _id: req.params.id, userId: req.params.userId });
+    res.json({ message: "Task deleted" });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error deleting record");
+    res.status(500).json({ message: "Error deleting task" });
   }
 });
 
-export default router;
+module.exports = router;
