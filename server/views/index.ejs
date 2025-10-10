@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Todo App</title>
+  </head>
+  <body>
+    <h1>Todo List</h1>
+
+    <form action="/add/todo" method="POST">
+      <input type="text" name="todo" placeholder="Enter todo" required />
+      <input type="text" name="username" placeholder="Enter username" required />
+      <button type="submit">Add Todo</button>
+    </form>
+
+    <ul>
+      <% todos.forEach(function(item) { %>
+        <li>
+          <%= item.todo %> (<%= item.email_ %>)
+          <% if (item.done === "0") { %>
+            <a href="/update/todo/<%= item._id %>">Mark Done</a>
+          <% } else { %>
+            ✅ Done
+          <% } %>
+          <a href="/delete/todo/<%= item._id %>">Delete</a>
+        </li>
+      <% }) %>
+    </ul>
+  </body>
+</html>

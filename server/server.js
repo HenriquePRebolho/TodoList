@@ -1,23 +1,44 @@
 const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-require("dotenv").config({ path: "./config.env" });
-
+const session = require("express-session");
+const passport = require("passport");
+const connectDB = require("./db/connection");
+const todoRoutes = require("./routes/todo");
 const authRoutes = require("./routes/auth");
-const recordRoutes = require("./routes/record");
+const path = require("path");
 
 const app = express();
-app.use(cors());
+
+connectDB();
+
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/todolist")
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error(err));
+app.use(
+  session({
+    secret: "secretKey",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/tasks", recordRoutes);
+app.use(passport.initialize());
+app.use(passport.session());
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+app.use("/", todoRoutes);
+app.use("/auth", authRoutes);
+
+app.get("/", async (req, res) => {
+  const Todo = require("./models/todo");
+  const todos = await Todo.find();
+  res.render("index", { todos });
+});
+
+const PORT = 3000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+app.get("/login", (req, res) => {
+  res.render("login");
+});

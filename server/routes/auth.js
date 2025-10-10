@@ -1,60 +1,69 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const User = require("../models/User");
-
 const router = express.Router();
 
-// Register
-router.post("/register", async (req, res) => {
+router.post("/register", (req, res) => {
   const { username, password } = req.body;
-  try {
-    const existing = await User.findOne({ username });
-    if (existing) {
-      return res.status(400).json({ message: "User already exists" });
+
+  bcrypt.genSalt(10, (err, salt) => {
+    if (err) {
+      console.error("Error generating salt:", err);
+      return res.status(500).send("Error generating salt");
     }
 
-    // 비밀번호 해시 생성
-    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("Salt generated successfully");
 
-    // 여기가 중요 — passwordHash 필드에 직접 넣기
-    const newUser = new User({
-      username: username,
-      passwordHash: hashedPassword
+    bcrypt.hash(password, salt, (err, hash) => {
+      if (err) {
+        console.error("Error hashing password:", err);
+        return res.status(500).send("Error hashing password");
+      }
+
+      console.log("Hashed password:", hash);
+
+      const newUser = new User({
+        username,
+        password: hash,
+      });
+
+      newUser
+        .save()
+        .then(() => {
+          console.log("User registered successfully");
+          res.redirect("/login");
+        })
+        .catch((err) => {
+          console.error("Error saving user:", err);
+          res.status(500).send("Error saving user");
+        });
     });
-
-    await newUser.save();
-    res.status(201).json({ message: "User registered successfully" });
-  } catch (err) {
-    console.error("❌ Error in /register:", err);
-    res.status(500).json({ message: "Server error" });
-  }
+  });
 });
 
-// Login
 router.post("/login", async (req, res) => {
-  console.log("📩 Login request body:", req.body);
   const { username, password } = req.body;
 
-  try {
-    const user = await User.findOne({ username });
-    console.log("🔍 Found user:", user); // 확인용 로그
+  const user = await User.findOne({ username });
+  if (!user) {
+    console.log("User not found");
+    return res.status(404).send("User not found");
+  }
 
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
-
-    if (!user.passwordHash) {
-      console.error("❌ passwordHash is missing in DB for this user");
-      return res.status(500).json({ message: "User data corrupted (no password hash)" });
+  bcrypt.compare(password, user.password, (err, result) => {
+    if (err) {
+      console.error("Error comparing passwords:", err);
+      return res.status(500).send("Error comparing passwords");
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
-
-    res.json({ message: "Login successful", userId: user._id });
-  } catch (err) {
-    console.error("❌ Login error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
+    if (result) {
+      console.log("Passwords match! User authenticated.");
+      res.redirect("/");
+    } else {
+      console.log("Passwords do not match! Authentication failed.");
+      res.status(401).send("Invalid password");
+    }
+  });
 });
-
 
 module.exports = router;
